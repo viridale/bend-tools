@@ -5,8 +5,8 @@
 #   else the checker's output or the mismatch, exit 1.
 # Run: lawcheck.sh [-b main] [-l LAWS.bend] [-m cli.bend] [-p] [stub.bend]
 #
-# The worktree (less .git, .claude, tmp and build) is copied to
-# tmp/lawcheck/new and the base ref is extracted to tmp/lawcheck/base. The
+# The worktree (less .git, .claude, tmp and build) and base ref are copied to
+# a unique tmp/lawcheck.* directory. The
 # stub holds the planned defs, with ?TODO bodies, and is appended to the
 # module (-m) in the copy, so every importer of the module (demo.bend and
 # LAWS.bend alike) sees one module with the planned signatures; a separate
@@ -45,8 +45,9 @@ cd "$root"
 git rev-parse -q --verify "$ref^{commit}" >/dev/null ||
   { echo "lawcheck: no commit $ref" >&2; exit 2; }
 
-work=tmp/lawcheck
-rm -rf "$work"
+mkdir -p "$root/tmp"
+work=$(mktemp -d "$root/tmp/lawcheck.XXXXXX")
+trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/base" "$work/new"
 git archive "$ref" | tar -x -C "$work/base"
 rsync -a --exclude=/.git --exclude=/.claude --exclude=/tmp --exclude=/build \

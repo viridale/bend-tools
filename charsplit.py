@@ -10,7 +10,7 @@ The checker reduces a match on a char only where the char's bits are
 constructors. A `case _:` arm leaves a bit it has ruled out one value of as
 a variable, so the view spells out every leaf instead.
 """
-import sys
+import argparse
 
 
 def bit(c, i):
@@ -39,7 +39,15 @@ def leaves(codes, bits=()):
 
 
 def main():
-    other, codes = sys.argv[1], [int(a) for a in sys.argv[2:]]
+    parser = argparse.ArgumentParser(description='Generate exhaustive Char proof match arms.')
+    parser.add_argument('other', metavar='OTHER')
+    parser.add_argument('codes', metavar='CODE', type=int, nargs='+')
+    args = parser.parse_args()
+    other, codes = args.other, args.codes
+    if any(c < 0 or c >= 1 << 32 for c in codes):
+        parser.error('CODE must be in the range 0..4294967295')
+    if len(set(codes)) != len(codes):
+        parser.error('CODE values must be unique')
     n = len(codes)
     for p, c in leaves(codes):
         if c is None:

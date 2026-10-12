@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Purpose: count term_keep, ctr_take and rfc_seal per def in Bend's emitted C,
-#   optionally selecting source files and comparing with a baseline.
+#   optionally selecting exact FIDs or FID prefixes and comparing with a baseline.
 # Expected output: with one argument, the counts in baseline form; with two,
 #   "rc: <n> defs equal <baseline>", or each differing def and exit 1.
-# Run: rc.sh build/app.c [bench/rc.txt] [--file MAIN] [--file LIB]
+# Run: rc.sh build/app.c [bench/rc.txt] [--fid FID_MAIN_FOO] [--fid-prefix FID_MAIN_]
 #
 # A def's counts cover its segment, its continuations (FID_<def>_K<n>, which
 # follow it), and each spin helper they call, once per call site and expanded
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 usage() {
-  echo 'usage: rc.sh <file.c> [baseline] [--file SOURCE_NAME]...' >&2
+  echo 'usage: rc.sh <file.c> [baseline] [--fid FID_NAME]... [--fid-prefix FID_PREFIX]...' >&2
   exit 2
 }
 
@@ -22,25 +22,30 @@ shift
 [ -r "$source_file" ] || { echo "rc: cannot read $source_file" >&2; exit 2; }
 
 baseline=
-if [ $# -gt 0 ] && [ "$1" != --file ]; then
+if [ $# -gt 0 ] && [[ $1 != --* ]]; then
   baseline=$1
   shift
   [ -r "$baseline" ] || { echo "rc: cannot read $baseline" >&2; exit 2; }
 fi
 
-files=
+fids='' prefixes=''
 while [ $# -gt 0 ]; do
-  [ "$1" = --file ] && [ $# -ge 2 ] || usage
-  [[ "$2" =~ ^[A-Z][A-Z0-9_]*$ ]] || usage
-  files="$files $2"
+  [ $# -ge 2 ] || usage
+  [[ $2 =~ ^FID_[A-Z0-9_]+$ ]] || usage
+  case $1 in
+    --fid) fids="$fids $2" ;;
+    --fid-prefix) prefixes="$prefixes $2" ;;
+    *) usage ;;
+  esac
   shift 2
 done
 
-counts=$(LC_ALL=C awk -v files="$files" '
+counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" '
   function wanted(fid,   i) {
-    if (file_count == 0) return 1
-    for (i = 1; i <= file_count; i++)
-      if (index(fid, "FID_" file[i] "_") == 1) return 1
+    if (fid_count + prefix_count == 0) return 1
+    for (i = 1; i <= fid_count; i++) if (fid == exact[i]) return 1
+    for (i = 1; i <= prefix_count; i++)
+      if (index(fid, prefix[i]) == 1) return 1
     return 0
   }
   function scan(line, unit,   k, t, s) {
@@ -75,8 +80,9 @@ counts=$(LC_ALL=C awk -v files="$files" '
   }
   BEGIN {
     op[1] = "term_keep"; op[2] = "ctr_take"; op[3] = "rfc_seal"
-    sub(/^ /, "", files)
-    if (files != "") file_count = split(files, file, " ")
+    sub(/^ /, "", fids); sub(/^ /, "", prefixes)
+    if (fids != "") fid_count = split(fids, exact, " ")
+    if (prefixes != "") prefix_count = split(prefixes, prefix, " ")
   }
   /^\/\/ =+$/ && prev ~ /^\/\/ [A-Z][A-Za-z0-9]*$/ {
     sec = substr(prev, 4); seen[sec] = 1; unit = ""
