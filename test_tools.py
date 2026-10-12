@@ -3,6 +3,7 @@
 
 import os
 from pathlib import Path
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -187,6 +188,65 @@ case WL_CASE(FID_MAIN_EXTRA_BAR):
         got = self.run_tool('rc.sh', source, '--fid-prefix', 'FID_MAIN_')
         self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
         self.assertIn('FID_MAIN_EXTRA_BAR 0 1 0', got.stdout)
+        got = self.run_tool('rc.sh', source)
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn('FID_MAIN_FOO 1 0 0', got.stdout)
+        self.assertIn('FID_MAIN_EXTRA_BAR 0 1 0', got.stdout)
+
+    def test_rc_deepest_file_normalizes_path_qualified_fids(self):
+        source = self.write('bench.c', '''// Spins
+// =====
+// Segments
+// =====
+case WL_CASE(FID____CLI_FOO):
+  term_keep(x);
+case WL_CASE(FID____CLI_FOO_K1):
+  term_keep(x);
+case WL_CASE(FID____RUN_BAR):
+  ctr_take(x);
+case WL_CASE(FID_CLI_SPEC):
+  rfc_seal(x);
+case WL_CASE(FID_RUN_TEXT):
+  rfc_seal(x);
+case WL_CASE(FID_MISC_ONE):
+  rfc_seal(x);
+''')
+        got = self.run_tool('rc.sh', source, '--deepest-file', 'CLI',
+                            '--deepest-file', 'RUN', '--deepest-file', 'MISC')
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertEqual(got.stdout.splitlines()[1:],
+                         ['FID_CLI_FOO 2 0 0', 'FID_RUN_BAR 0 1 0'])
+
+    def test_bench_compares_stdout_but_allows_changing_stderr(self):
+        flag = '-l' if platform.system() == 'Darwin' else '-v'
+        time_out = self.root / 'time.out'
+        timed = subprocess.run(['/usr/bin/time', flag, '-o', str(time_out),
+                                '/usr/bin/true'], capture_output=True)
+        if timed.returncode != 0:
+            self.skipTest('system time cannot measure peak RSS here')
+        self.repo()
+        self.write('app.bend', 'old\n')
+        self.git('add', 'app.bend')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.com',
+                 'commit', '-qm', 'base')
+        self.write('app.bend', 'new\n')
+        self.write('bin/sysctl', '#!/bin/sh\necho 2\n', executable=True)
+        self.write('bin/bend', '''#!/bin/sh
+src=$1
+shift
+[ "$1" = -o ] || exit 2
+dest=$2
+if [ "$BENCH_TEST_OUTPUT" = same ]; then out=same; else out=$(cat "$src"); fi
+printf '#!/bin/sh\\necho %s\\necho "phase $$" >&2\\n' "$out" >"$dest"
+chmod +x "$dest"
+''', executable=True)
+        for mode, code, says in [('same', 0, 'stdout identical across builds'),
+                                 ('different', 1, 'old and new stdout differ')]:
+            with self.subTest(mode=mode):
+                self.env['BENCH_TEST_OUTPUT'] = mode
+                got = self.run_tool('bench.sh', '-L', '999999', '-n', '1', 'app.bend')
+                self.assertEqual(got.returncode, code, got.stdout + got.stderr)
+                self.assertIn(says, got.stdout)
 
     def test_bench_rejects_failed_run_and_keeps_other_scratch(self):
         self.repo()

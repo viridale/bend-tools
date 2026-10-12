@@ -17,6 +17,7 @@ From a Bend repo next to this checkout:
 ```sh
 ../bend-tools/rc.sh build/app.c --fid-prefix FID_MAIN_ > bench/rc.txt
 ../bend-tools/rc.sh build/app.c bench/rc.txt --fid-prefix FID_MAIN_
+../bend-tools/rc.sh build/bench.c --deepest-file CLI --deepest-file RUN
 python3 ../bend-tools/charsplit.py OTHER 65 66
 ```
 
@@ -25,6 +26,8 @@ Python 3, `curl`, `rsync`, and GNU `timeout`. Each tool pins Bend 2.0.36 and
 warns when the installed version or latest GitHub release differs. The release
 check is cached for a day and never blocks the tool. Scratch files use unique
 directories under the target repo's `tmp/`. `--fid-prefix` is a literal prefix;
-`--fid` selects one def exactly. `chk.sh -e` takes a tab-separated file/def
-allowlist. Run `python3 test_tools.py` for regression checks. MIT licensed;
-see [LICENSE](LICENSE).
+`--fid` selects one def exactly. `--deepest-file` uses FID naming to select
+named basenames at the greatest import-path depth and normalize their FIDs;
+depth-zero names can be ambiguous. It cannot be mixed with the literal FID
+selectors. `chk.sh -e` takes a tab-separated file/def allowlist. Run
+`python3 test_tools.py` for regression checks. MIT licensed; see [LICENSE](LICENSE).

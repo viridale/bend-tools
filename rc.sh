@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # Purpose: count term_keep, ctr_take and rfc_seal per def in Bend's emitted C,
-#   optionally selecting exact FIDs or FID prefixes and comparing with a baseline.
+#   optionally selecting exact FIDs, literal FID prefixes, or defs of named
+#   files at the greatest import-path depth, and comparing with a baseline.
 # Expected output: with one argument, the counts in baseline form; with two,
 #   "rc: <n> defs equal <baseline>", or each differing def and exit 1.
-# Run: rc.sh build/app.c [bench/rc.txt] [--fid FID_MAIN_FOO] [--fid-prefix FID_MAIN_]
+# Run: rc.sh build/app.c [bench/rc.txt] [--fid FID_MAIN_FOO]
+#   [--fid-prefix FID_MAIN_] [--deepest-file CLI]
 #
 # A def's counts cover its segment, its continuations (FID_<def>_K<n>, which
 # follow it), and each spin helper they call, once per call site and expanded
 # through the spins that spin calls. Spin numbers change between builds, so a
 # spin counts only toward its callers.
+# Bend encodes each "../" in an import path as three underscores after FID_.
+# --deepest-file NAME keeps the greatest path depth across all named files
+# and prints their FIDs without the path prefix, for comparable counts across
+# harnesses. Supplying related file names together excludes shallower defs
+# whose names merely share a file prefix. At depth 0, a local cli_foo def
+# cannot be distinguished from a def of cli.bend by FID alone.
 set -euo pipefail
 BEND_TOOLS_PIN=2.0.36
 # shellcheck source=.bend-version.sh
@@ -16,7 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/.bend-version.sh"
 bend_tools_warn_version "$BEND_TOOLS_PIN" "$(basename "$0")"
 
 usage() {
-  echo 'usage: rc.sh <file.c> [baseline] [--fid FID_NAME]... [--fid-prefix FID_PREFIX]...' >&2
+  echo 'usage: rc.sh <file.c> [baseline] [--fid FID_NAME]... [--fid-prefix FID_PREFIX]... [--deepest-file NAME]...' >&2
   exit 2
 }
 
@@ -32,20 +40,39 @@ if [ $# -gt 0 ] && [[ $1 != --* ]]; then
   [ -r "$baseline" ] || { echo "rc: cannot read $baseline" >&2; exit 2; }
 fi
 
-fids='' prefixes=''
+fids='' prefixes='' deepest_files=''
 while [ $# -gt 0 ]; do
   [ $# -ge 2 ] || usage
-  [[ $2 =~ ^FID_[A-Z0-9_]+$ ]] || usage
   case $1 in
-    --fid) fids="$fids $2" ;;
-    --fid-prefix) prefixes="$prefixes $2" ;;
+    --fid)
+      [[ $2 =~ ^FID_[A-Z0-9_]+$ ]] || usage
+      fids="$fids $2" ;;
+    --fid-prefix)
+      [[ $2 =~ ^FID_[A-Z0-9_]+$ ]] || usage
+      prefixes="$prefixes $2" ;;
+    --deepest-file)
+      [[ $2 =~ ^[A-Z][A-Z0-9_]*$ ]] || usage
+      deepest_files="$deepest_files $2" ;;
     *) usage ;;
   esac
   shift 2
 done
+[ -z "$deepest_files" ] || [ -z "$fids$prefixes" ] || usage
 
-counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" '
-  function wanted(fid,   i) {
+counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" -v deepest_files="$deepest_files" '
+  function wanted(fid,   i, d, pattern) {
+    if (file_count) {
+      for (i = 1; i <= file_count; i++) {
+        pattern = "^FID_(___)*" file[i] "_"
+        if (match(fid, pattern)) {
+          d = (RLENGTH - 5 - length(file[i])) / 3
+          file_depth[fid] = d
+          if (d > max_depth) max_depth = d
+          return 1
+        }
+      }
+      return 0
+    }
     if (fid_count + prefix_count == 0) return 1
     for (i = 1; i <= fid_count; i++) if (fid == exact[i]) return 1
     for (i = 1; i <= prefix_count; i++)
@@ -84,9 +111,10 @@ counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" '
   }
   BEGIN {
     op[1] = "term_keep"; op[2] = "ctr_take"; op[3] = "rfc_seal"
-    sub(/^ /, "", fids); sub(/^ /, "", prefixes)
+    sub(/^ /, "", fids); sub(/^ /, "", prefixes); sub(/^ /, "", deepest_files)
     if (fids != "") fid_count = split(fids, exact, " ")
     if (prefixes != "") prefix_count = split(prefixes, prefix, " ")
+    if (deepest_files != "") file_count = split(deepest_files, file, " ")
   }
   /^\/\/ =+$/ && prev ~ /^\/\/ [A-Z][A-Za-z0-9]*$/ {
     sec = substr(prev, 4); seen[sec] = 1; unit = ""
@@ -109,13 +137,19 @@ counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" '
       exit 2
     }
     for (u in own) {
+      if (file_count && file_depth[u] != max_depth) continue
+      name = file_count ? "FID_" substr(u, 5 + 3 * file_depth[u]) : u
+      if (seen_name[name]++) {
+        print "rc: ambiguous normalized FID " name > "/dev/stderr"
+        exit 2
+      }
       for (k = 1; k <= 3; k++) t[k] = n[u, k]
       m = split(calls[u], c, " ")
       for (i = 1; i <= m; i++) {
         expand(c[i])
         for (k = 1; k <= 3; k++) t[k] += x[c[i], k]
       }
-      printf "%s %d %d %d\n", u, t[1], t[2], t[3]
+      printf "%s %d %d %d\n", name, t[1], t[2], t[3]
     }
   }
 ' "$source_file" | LC_ALL=C sort)
