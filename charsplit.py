@@ -4,7 +4,7 @@ Expected output: one `case` per leaf of a split of c's 32 bits, LSB first,
   just far enough to tell each code from every other char. The arm of the
   i-th code (from 0) proves `{Chr{code} == c : Char}` as Inr^i(Inl{{==}}); every
   other leaf gives OTHER as Inr^n(OTHER), for n codes.
-Run: python3 tools/charsplit.py OTHER CODE...
+Run: python3 charsplit.py OTHER CODE...
 
 The checker reduces a match on a char only where the char's bits are
 constructors. A `case _:` arm leaves a bit it has ruled out one value of as

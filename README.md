@@ -1,27 +1,25 @@
 # bend-tools
 
-Standalone utilities for Bend repositories, originally from
-[bend-cli](https://github.com/viridale/bend-cli).
+Standalone Bend utilities from [bend-cli](https://github.com/viridale/bend-cli).
 
-## `rc.sh`
+| Tool | Purpose |
+| --- | --- |
+| `rc.sh` | Count keep/take/seal calls per def in emitted C. |
+| `charsplit.py` | Generate exhaustive `Char` proof match arms. |
+| `lawcheck.sh` | Type-check new laws against planned definitions. |
+| `perlaw.sh` | Check proof laws separately. |
+| `kernel.sh` | Explain a `--verdict` failure. |
+| `chk.sh` | Filter expected `--check-only` diagnostics. |
+| `bench.sh` | Compare native builds at a base ref and the worktree. |
 
-Count `term_keep`, `ctr_take`, and `rfc_seal` per def in Bend-generated C.
-`--file` selects source files by uppercase name; omit it to count all defs.
-
-```sh
-./rc.sh build/app.c --file MAIN > bench/rc.txt
-./rc.sh build/app.c bench/rc.txt --file MAIN
-```
-
-The first command saves a baseline; the second compares against it.
-
-## `charsplit.py`
-
-Generate exhaustive `match c:` arms for a `Char` proof from a fallback
-expression and decimal code points:
+From a Bend repo next to this checkout:
 
 ```sh
-python3 charsplit.py OTHER 65 66
+../bend-tools/rc.sh build/app.c --file MAIN > bench/rc.txt
+../bend-tools/rc.sh build/app.c bench/rc.txt --file MAIN
+python3 ../bend-tools/charsplit.py OTHER 65 66
 ```
 
-MIT licensed; see [LICENSE](LICENSE).
+See each script's header for options. Requirements vary by tool: Bend, Bash 5,
+Python 3, `rsync`, and GNU `timeout`. Some scripts replace their own `tmp/`
+workspace in the target repo. MIT licensed; see [LICENSE](LICENSE).
