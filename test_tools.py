@@ -19,6 +19,10 @@ class ToolTests(unittest.TestCase):
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.env = dict(os.environ, PATH=f'{self.bin}:{os.environ["PATH"]}')
+        self.env['XDG_CACHE_HOME'] = str(self.root / 'cache')
+        self.write('bin/curl', '#!/bin/sh\nprintf \'{"tag_name": "v2.0.36"}\\n\'\n',
+                   executable=True)
+        self.write('bin/bend', '#!/bin/sh\necho "bend 2.0.36"\n', executable=True)
 
     def write(self, name, content, executable=False):
         path = self.root / name
@@ -48,6 +52,41 @@ class ToolTests(unittest.TestCase):
         got = self.run_tool('charsplit.py', 'OTHER', '65', '66')
         self.assertEqual(got.returncode, 0)
         self.assertIn('Inl{{==}}', got.stdout)
+
+    def test_version_pin_warns_for_new_release_without_blocking(self):
+        self.write('bin/curl', '''#!/bin/sh
+mkdir -p "$XDG_CACHE_HOME"
+echo called >> "$XDG_CACHE_HOME/curl_calls"
+printf '{"tag_name": "v2.0.37"}\\n'
+''', executable=True)
+        for _ in range(2):
+            got = self.run_tool('charsplit.py', 'OTHER', '65')
+            self.assertEqual(got.returncode, 0, got.stderr)
+            self.assertIn('pinned to Bend 2.0.36; latest release is 2.0.37', got.stderr)
+        calls = (self.root / 'cache/curl_calls').read_text().splitlines()
+        self.assertEqual(calls, ['called'])
+
+    def test_version_pin_warns_for_installed_mismatch(self):
+        self.write('bin/bend', '#!/bin/sh\necho "bend 2.0.35"\n', executable=True)
+        got = self.run_tool('charsplit.py', 'OTHER', '65')
+        self.assertEqual(got.returncode, 0, got.stderr)
+        self.assertIn('pinned to Bend 2.0.36; installed Bend is 2.0.35', got.stderr)
+
+    def test_version_lookup_failure_warns_without_blocking(self):
+        self.write('bin/curl', '#!/bin/sh\nexit 22\n', executable=True)
+        got = self.run_tool('charsplit.py', 'OTHER', '65')
+        self.assertEqual(got.returncode, 0, got.stderr)
+        self.assertIn('could not verify latest Bend release', got.stderr)
+
+    def test_every_utility_runs_version_advisory(self):
+        self.repo()
+        self.write('bin/curl', '#!/bin/sh\nprintf \'{"tag_name": "v2.0.37"}\\n\'\n',
+                   executable=True)
+        for name in ('bench.sh', 'chk.sh', 'kernel.sh', 'lawcheck.sh',
+                     'perlaw.sh', 'rc.sh', 'charsplit.py'):
+            with self.subTest(name=name):
+                got = self.run_tool(name)
+                self.assertIn('latest release is 2.0.37', got.stderr)
 
     def test_chk_only_hides_exact_allowlisted_defs(self):
         self.repo()

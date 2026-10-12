@@ -15,6 +15,10 @@
 # -p then plants a law with a type error and requires the check to reject
 # it, so a passing count is not vacuous.
 set -euo pipefail
+BEND_TOOLS_PIN=2.0.36
+# shellcheck source=.bend-version.sh
+source "$(dirname "${BASH_SOURCE[0]}")/.bend-version.sh"
+bend_tools_warn_version "$BEND_TOOLS_PIN" "$(basename "$0")"
 
 usage() {
   echo 'usage: lawcheck.sh [-b ref] [-l laws.bend] [-m module.bend] [-p] [stub.bend]' >&2

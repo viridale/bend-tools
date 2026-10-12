@@ -10,6 +10,10 @@
 # through the spins that spin calls. Spin numbers change between builds, so a
 # spin counts only toward its callers.
 set -euo pipefail
+BEND_TOOLS_PIN=2.0.36
+# shellcheck source=.bend-version.sh
+source "$(dirname "${BASH_SOURCE[0]}")/.bend-version.sh"
+bend_tools_warn_version "$BEND_TOOLS_PIN" "$(basename "$0")"
 
 usage() {
   echo 'usage: rc.sh <file.c> [baseline] [--fid FID_NAME]... [--fid-prefix FID_PREFIX]...' >&2

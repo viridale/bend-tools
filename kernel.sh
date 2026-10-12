@@ -12,6 +12,10 @@
 # sha256(<LEAN_VERSION> NUL <bendtt.lean>), LEAN_VERSION read from the bend
 # binary and bendtt.lean from the bend2 directory beside its bin directory.
 set -euo pipefail
+BEND_TOOLS_PIN=2.0.36
+# shellcheck source=.bend-version.sh
+source "$(dirname "${BASH_SOURCE[0]}")/.bend-version.sh"
+bend_tools_warn_version "$BEND_TOOLS_PIN" "$(basename "$0")"
 
 usage() { echo 'usage: kernel.sh [-t secs] [file.bend]' >&2; exit 2; }
 secs=1800

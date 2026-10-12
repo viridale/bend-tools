@@ -11,6 +11,23 @@ constructors. A `case _:` arm leaves a bit it has ruled out one value of as
 a variable, so the view spells out every leaf instead.
 """
 import argparse
+from pathlib import Path
+import subprocess
+import sys
+
+
+BEND_TOOLS_PIN = '2.0.36'
+
+
+def warn_bend_version():
+    try:
+        subprocess.run(
+            ['bash', str(Path(__file__).resolve().with_name('.bend-version.sh')),
+             BEND_TOOLS_PIN, Path(__file__).name],
+            check=False,
+        )
+    except OSError as exc:
+        print(f'charsplit.py: version check unavailable: {exc}', file=sys.stderr)
 
 
 def bit(c, i):
@@ -39,6 +56,7 @@ def leaves(codes, bits=()):
 
 
 def main():
+    warn_bend_version()
     parser = argparse.ArgumentParser(description='Generate exhaustive Char proof match arms.')
     parser.add_argument('other', metavar='OTHER')
     parser.add_argument('codes', metavar='CODE', type=int, nargs='+')

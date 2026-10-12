@@ -21,7 +21,10 @@ python3 ../bend-tools/charsplit.py OTHER 65 66
 ```
 
 See each script's header for options. Requirements vary by tool: Bend, Bash 5,
-Python 3, `rsync`, and GNU `timeout`. Scratch files use unique directories under
-the target repo's `tmp/`. `--fid-prefix` is a literal prefix; `--fid` selects
-one def exactly. `chk.sh -e` takes a tab-separated file/def allowlist. Run
-`python3 test_tools.py` for regression checks. MIT licensed; see [LICENSE](LICENSE).
+Python 3, `curl`, `rsync`, and GNU `timeout`. Each tool pins Bend 2.0.36 and
+warns when the installed version or latest GitHub release differs. The release
+check is cached for a day and never blocks the tool. Scratch files use unique
+directories under the target repo's `tmp/`. `--fid-prefix` is a literal prefix;
+`--fid` selects one def exactly. `chk.sh -e` takes a tab-separated file/def
+allowlist. Run `python3 test_tools.py` for regression checks. MIT licensed;
+see [LICENSE](LICENSE).
