@@ -29,5 +29,6 @@ directories under the target repo's `tmp/`. `--fid-prefix` is a literal prefix;
 `--fid` selects one def exactly. `--deepest-file` uses FID naming to select
 named basenames at the greatest import-path depth and normalize their FIDs;
 depth-zero names can be ambiguous. It cannot be mixed with the literal FID
-selectors. `chk.sh -e` takes a tab-separated file/def allowlist. Run
+selectors. `rc.sh` folds numbered `_C` closures and `_K` continuations into
+their parent def. `chk.sh -e` takes a tab-separated file/def allowlist. Run
 `python3 test_tools.py` for regression checks. MIT licensed; see [LICENSE](LICENSE).

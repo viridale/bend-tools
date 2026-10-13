@@ -217,6 +217,42 @@ case WL_CASE(FID_MISC_ONE):
         self.assertEqual(got.stdout.splitlines()[1:],
                          ['FID_CLI_FOO 2 0 0', 'FID_RUN_BAR 0 1 0'])
 
+    def test_rc_folds_renumbered_closures_and_continuations(self):
+        def build(name, c, k, orphan):
+            return self.write(name, f'''// Spins
+// =====
+// Segments
+// =====
+case WL_CASE(FID____CLI_EVAL_0):
+  term_keep(x);
+case WL_CASE(FID____CLI_EVAL_0_C{c}):
+  ctr_take(x);
+case WL_CASE(FID____CLI_EVAL_0_K{k}):
+  rfc_seal(x);
+case WL_CASE(FID____CLI_NEXT):
+  ctr_take(x);
+case WL_CASE(FID____CLI_INLINED_C{orphan}):
+  term_keep(x);
+case WL_CASE(FID_CLI_LOCAL):
+  rfc_seal(x);
+''')
+
+        old = build('old.c', 2721, 2722, 2750)
+        new = build('new.c', 2666, 2667, 2695)
+        expected = ['FID_CLI_EVAL_0 1 1 1', 'FID_CLI_INLINED 1 0 0',
+                    'FID_CLI_NEXT 0 1 0']
+        got = self.run_tool('rc.sh', old, '--deepest-file', 'CLI')
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertEqual(got.stdout.splitlines()[1:], expected)
+        base = self.write('base.txt', got.stdout)
+        got = self.run_tool('rc.sh', new, base, '--deepest-file', 'CLI')
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn('rc: 3 defs equal', got.stdout)
+        got = self.run_tool('rc.sh', old, '--fid', 'FID____CLI_EVAL_0')
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertEqual(got.stdout.splitlines()[1:],
+                         ['FID____CLI_EVAL_0 1 1 1'])
+
     def test_bench_compares_stdout_but_allows_changing_stderr(self):
         flag = '-l' if platform.system() == 'Darwin' else '-v'
         time_out = self.root / 'time.out'

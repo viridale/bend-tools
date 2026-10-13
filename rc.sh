@@ -7,10 +7,14 @@
 # Run: rc.sh build/app.c [bench/rc.txt] [--fid FID_MAIN_FOO]
 #   [--fid-prefix FID_MAIN_] [--deepest-file CLI]
 #
-# A def's counts cover its segment, its continuations (FID_<def>_K<n>, which
-# follow it), and each spin helper they call, once per call site and expanded
-# through the spins that spin calls. Spin numbers change between builds, so a
-# spin counts only toward its callers.
+# A def's counts cover its segment, its continuations (FID_<def>_K<n>), its
+# lifted closures (FID_<def>_C<n>), and each spin helper they call, once per
+# call site and expanded through the spins that spin calls. A closure counts
+# toward the def that builds it, though it runs when its callee applies it.
+# Spin, continuation, and closure numbers may change between builds, so
+# numbered segments lose their _C<n> or _K<n> suffix before comparison. This
+# also merges a def whose own name ends in _c<n> or _k<n> with the shorter name,
+# and counts closures for an inlined def with no segment of its own.
 # Bend encodes each "../" in an import path as three underscores after FID_.
 # --deepest-file NAME keeps the greatest path depth across all named files
 # and prints their FIDs without the path prefix, for comparable counts across
@@ -124,8 +128,8 @@ counts=$(LC_ALL=C awk -v fids="$fids" -v prefixes="$prefixes" -v deepest_files="
   }
   sec == "Spins" && /^}/ { unit = "" }
   sec == "Segments" && match($0, /WL_CASE\(FID_[A-Z0-9_]+\)/) {
-    f = substr($0, RSTART + 8, RLENGTH - 9); b = f; sub(/_K[0-9]+$/, "", b)
-    if (b != def) def = f
+    f = substr($0, RSTART + 8, RLENGTH - 9); b = f; sub(/_[CK][0-9]+$/, "", b)
+    if (b != def) def = b
     unit = wanted(def) ? def : ""
     if (unit != "") own[unit] = 1
   }
