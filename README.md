@@ -1,7 +1,5 @@
 # bend-tools
 
-Standalone Bend utilities from [bend-cli](https://github.com/viridale/bend-cli).
-
 | Tool | Purpose |
 | --- | --- |
 | `rc.sh` | Count keep/take/seal calls per def in emitted C. |
